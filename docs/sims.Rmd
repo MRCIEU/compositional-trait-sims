@@ -77,7 +77,7 @@ hist(phen$chd)
 MVMR without scaling
 
 ```{r}
-dat <- make_mvdat(list(phen$y_active, phen$y_sedentary, phen$y_sleeping), phen$chd, geno)
+dat <- make_mvdat(list(active=phen$y_active, sedentary=phen$y_sedentary, sleeping=phen$y_sleeping), phen$chd, geno)
 str(dat)
 ```
 ```{r}
@@ -87,9 +87,79 @@ mv_multiple(dat)
 MVMR with scaling
 
 ```{r}
-dat <- make_mvdat(list(phen_scale$y_active, phen_scale$y_sedentary, phen_scale$y_sleeping), phen_scale$chd, geno)
-mv_multiple(dat)
+dat <- make_mvdat(list(active=phen_scale$y_active, sedentary=phen_scale$y_sedentary, sleeping=phen_scale$y_sleeping), phen_scale$chd, geno)
+
+str(dat)
+summary(lm(dat$outcome_beta ~ 0 + dat$exposure_beta, weight=1/dat$outcome_se^2))
 ```
+
+Try removing the sleeping trait
+
+```{r}
+dat <- make_mvdat(list(active=phen_scale$y_active, sedentary=phen_scale$y_sedentary), phen_scale$chd, geno)
+(z <- mv_multiple(dat))
+```
+
+Remove active
+
+```{r}
+dat <- make_mvdat(list(sleeping=phen_scale$y_sleeping, sedentary=phen_scale$y_sedentary), phen_scale$chd, geno)
+(w <- mv_multiple(dat))
+```
+
+Remove sedentary
+
+```{r}
+dat <- make_mvdat(list(active=phen_scale$y_active, sleeping=phen_scale$y_sleeping), phen_scale$chd, geno)
+(y <- mv_multiple(dat))
+```
+
+Try to find a solution for vector of effects that will return estimates for each?
+
+```{r}
+fn <- function(x, y1, y2, w2, w3, z1, z3)
+{
+  x_upda <- rep(0, 3)
+  x_updb <- rep(0, 3)
+  x_upda[1] <- y1 + x[3]
+  x_updb[1] <- z1 + x[2]
+  x_updb[2] <- w2 + x[1]
+  x_upda[2] <- y2 + x[3]
+  x_upda[3] <- w3 + x[1]
+  x_updb[3] <- z3 + x[2]
+  return(sum((x_upda-x_updb)^2))
+}
+
+# All the following give solutions, showing that the system is unidentified
+optim(c(-0.1,-0.1,0.1), fn, 
+      y1=y$result$b[1],
+      y2=y$result$b[2],
+      w2=w$result$b[2],
+      w3=w$result$b[1],
+      z1=z$result$b[1],
+      z3=z$result$b[2]
+    )
+
+optim(c(1,1,1), fn, 
+      y1=y$result$b[1],
+      y2=y$result$b[2],
+      w2=w$result$b[2],
+      w3=w$result$b[1],
+      z1=z$result$b[1],
+      z3=z$result$b[2]
+    )
+
+optim(c(2,2,2), fn, 
+      y1=y$result$b[1],
+      y2=y$result$b[2],
+      w2=w$result$b[2],
+      w3=w$result$b[1],
+      z1=z$result$b[1],
+      z3=z$result$b[2]
+    )
+```
+
+This is just unidentified.
 
 Straightforward MR
 
@@ -102,11 +172,20 @@ mr(dat_sleeping, method="mr_ivw")
 mr(dat_sedentary, method="mr_ivw")
 ```
 
+Interpretation:
+
+1. The unscaled phenotype MV analysis is unbiased
+2. The straightforward MR appears somewhat biased due to pleiotropy
+3. The scaled MV analysis appears unbiased if we interpret the associations as being against the baseline of the mean value for the last trait
+4. It looks like the MR results for 2 traits are correct if we add the true causal effect of the missing trait, but there are an infinite set of solutions because the system is unidentified?
+
+
+
 ### Partitioning method
 
 Divide 24 hours into 3 segments, i.e. 2 breakpoints. Each breakpoint has a mean time, and each individual is given a deviation from the mean time.
 
-
+TODO...
 
 
 
